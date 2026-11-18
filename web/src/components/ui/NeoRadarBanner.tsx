@@ -55,10 +55,11 @@ export const NeoRadarBanner: FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: isMobile ? '124px' : '106px',
-        left: isMobile ? '10px' : '20px',
+        top: isMobile ? '126px' : '72px',
+        right: '16px',
+        left: 'auto',
         zIndex: 42,
-        maxWidth: isMobile ? 'calc(100vw - 20px)' : '320px',
+        maxWidth: isMobile ? 'calc(100vw - 32px)' : '320px',
         background: 'rgba(10, 16, 32, 0.90)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',

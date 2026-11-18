@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, type FC } from 'react';
-import { Plus, Minus, RotateCcw, Gamepad2, Sparkles, X, MapPin } from 'lucide-react';
+import { Plus, Minus, RotateCcw, Sparkles, X, MapPin } from 'lucide-react';
 import type { CameraControls } from '@react-three/drei';
 import { useFocusStore } from '../../state/useFocusStore';
-import { useTutorialStore } from '../../state/useTutorialStore';
 import { useSatelliteStore } from '../../state/useSatelliteStore';
 import { useSkyStore } from '../../state/useSkyStore';
 import { useGroundObserverStore } from '../../state/useGroundObserverStore';
@@ -145,7 +144,7 @@ export const ZoomControls: FC<ZoomControlsProps> = ({ controlsRef }) => {
       style={{
         position: 'absolute',
         bottom: isMobile ? (selectedId ? '74px' : '102px') : '24px',
-        right: isMobile ? '10px' : '24px',
+        left: isMobile ? '10px' : '24px',
         zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
@@ -160,36 +159,6 @@ export const ZoomControls: FC<ZoomControlsProps> = ({ controlsRef }) => {
         transition: 'bottom 0.25s ease',
       }}
     >
-      {!isMobile && (
-        <button
-          onClick={() => useTutorialStore.getState().openTutorial()}
-          title="Flight Manual & Game Controls Guide"
-          style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: 'none',
-            borderRadius: '10px',
-            width: '34px',
-            height: '34px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#38bdf8',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)';
-            e.currentTarget.style.transform = 'scale(1.08)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            e.currentTarget.style.transform = 'scale(1.0)';
-          }}
-        >
-          <Gamepad2 size={18} />
-        </button>
-      )}
-
       {/* 1. Planetarium Sky Dome Settings Popover Button */}
       <div style={{ position: 'relative' }} ref={skyMenuRef}>
         <button
@@ -269,40 +238,6 @@ export const ZoomControls: FC<ZoomControlsProps> = ({ controlsRef }) => {
                 <X size={12} />
               </button>
             </div>
-
-            {/* View Mode Switch Banner */}
-            <button
-              onClick={toggleViewMode}
-              style={{
-                width: '100%',
-                background: viewMode === 'ground'
-                  ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(56, 189, 248, 0.15))'
-                  : 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.12))',
-                border: viewMode === 'ground' ? '1.5px solid #4ade80' : '1px solid rgba(56, 189, 248, 0.35)',
-                borderRadius: '12px',
-                padding: '8px 10px',
-                color: '#ffffff',
-                marginBottom: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <span style={{ fontSize: '16px' }}>{viewMode === 'ground' ? '🚀' : '🏡'}</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: viewMode === 'ground' ? '#4ade80' : '#38bdf8' }}>
-                    {viewMode === 'ground' ? 'Return to Space Orbit' : 'Stand on Earth (Backyard Mode)'}
-                  </div>
-                  <div style={{ fontSize: '9.5px', color: '#94a3b8' }}>
-                    {viewMode === 'ground' ? 'Macro solar system view' : `Look up from ${location.name}`}
-                  </div>
-                </div>
-              </div>
-              <span style={{ fontSize: '11px', color: '#cbd5e1' }}>→</span>
-            </button>
 
             {/* Constellation & Deep Sky Toggles */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '8px' }}>

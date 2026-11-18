@@ -56,10 +56,11 @@ export const EclipseAlertBanner: FC = () => {
     <div
       style={{
         position: 'absolute',
-        top: isMobile ? '64px' : '20px',
-        left: isMobile ? '10px' : '360px',
-        right: isMobile ? '10px' : 'auto',
+        top: isMobile ? '62px' : '16px',
+        right: '16px',
+        left: 'auto',
         zIndex: 45,
+        maxWidth: isMobile ? 'calc(100vw - 32px)' : '320px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
     >
