@@ -1,6 +1,6 @@
 import { useMemo, useRef, type FC } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   COMET_CATALOG,
@@ -90,11 +90,15 @@ const CometEntity: FC<CometEntityProps> = ({ comet, projector }) => {
   const selectedId = useFocusStore((state) => state.selectedId);
 
   const groupRef = useRef<THREE.Group>(null);
+  const nucleusRef = useRef<THREE.Mesh>(null);
   const ionTailMeshRef = useRef<THREE.Mesh>(null);
   const dustTailMeshRef = useRef<THREE.Mesh>(null);
   const comaMeshRef = useRef<THREE.Mesh>(null);
 
   const isSelected = selectedId === comet.id;
+
+  // High-res comet nucleus texture (dark, cratered icy rock)
+  const nucleusTexture = useTexture('/textures/comet_nucleus.jpg');
 
   // Custom tail shader materials
   const ionTailMaterial = useMemo(() => {
@@ -199,6 +203,12 @@ const CometEntity: FC<CometEntityProps> = ({ comet, projector }) => {
     } else if (dustTailMeshRef.current) {
       dustTailMeshRef.current.visible = false;
     }
+
+    // Slow nucleus tumble on irregular axes (like real comets)
+    if (nucleusRef.current) {
+      nucleusRef.current.rotation.x += 0.004;
+      nucleusRef.current.rotation.y += 0.007;
+    }
   });
 
   return (
@@ -221,13 +231,14 @@ const CometEntity: FC<CometEntityProps> = ({ comet, projector }) => {
         document.body.style.cursor = 'auto';
       }}
     >
-      {/* 1. Icy Nucleus (Irregular Dark Charcoal Body) */}
-      <mesh castShadow receiveShadow>
+      {/* 1. Icy Nucleus — high-res textured irregular body, like ESA Rosetta imagery */}
+      <mesh ref={nucleusRef} castShadow receiveShadow>
         <dodecahedronGeometry args={[0.22, 1]} />
         <meshStandardMaterial
-          color="#1c1917"
-          roughness={0.92}
-          metalness={0.05}
+          map={nucleusTexture}
+          color="#888888"
+          roughness={0.95}
+          metalness={0.02}
         />
       </mesh>
 

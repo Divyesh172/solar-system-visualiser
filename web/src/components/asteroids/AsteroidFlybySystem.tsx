@@ -1,6 +1,6 @@
 import { useMemo, useRef, type FC } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSimulationClock } from '../../science/useSimulationClock';
 import { useFocusStore } from '../../state/useFocusStore';
@@ -26,6 +26,12 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
 
   const isSelected = selectedId === asteroid.id;
+
+  // High-res surface textures: hazardous asteroids get a reddish/amber rocky look,
+  // regular NEOs get a neutral grey carbonaceous chondrite surface.
+  const rockyTexture = useTexture('/textures/asteroid_rocky.jpg');
+  const hazardTexture = useTexture('/textures/asteroid_hazard.jpg');
+  const surfaceTexture = asteroid.isPotentiallyHazardous ? hazardTexture : rockyTexture;
 
   // Compute fixed 3D approach vector around Earth (distributing angles across catalog)
   const { trajectoryPoints, closestApproachPos, flybyVelocityDir } = useMemo(() => {
@@ -77,16 +83,17 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
     return Math.min(0.42, Math.max(0.18, (dMeters / 350.0) * 0.32));
   }, [asteroid.diameterMeters.avg]);
 
-  // Asteroid rocky material
+  // Asteroid rocky material — textured with NASA-sourced surface maps
   const rockMaterial = useMemo(() => {
     const isHazard = asteroid.isPotentiallyHazardous;
     return new THREE.MeshStandardMaterial({
-      color: isHazard ? '#71717a' : '#52525b',
-      roughness: 0.92,
-      metalness: 0.08,
-      flatShading: true,
+      map: surfaceTexture,
+      color: isHazard ? '#a86030' : '#7a7a7a',
+      roughness: 0.94,
+      metalness: 0.06,
+      flatShading: false,
     });
-  }, [asteroid.isPotentiallyHazardous]);
+  }, [asteroid.isPotentiallyHazardous, surfaceTexture]);
 
   const trajectoryColor = asteroid.isPotentiallyHazardous ? '#f59e0b' : '#38bdf8';
 
@@ -163,7 +170,7 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
         }}
       >
         <mesh ref={meshRef} material={rockMaterial} castShadow>
-          <icosahedronGeometry args={[meshSize, 1]} />
+          <icosahedronGeometry args={[meshSize, 2]} />
         </mesh>
 
         {/* Pulsing Target Ring for Hazardous Asteroids */}
