@@ -40,12 +40,16 @@ export const FactCard: FC = () => {
   const isAsteroid = !!asteroidMeta;
   const isPlanetOrMoon = !!selectedId && selectedId in PLANETARY_METADATA;
 
+  // ── ALL hooks must come before any conditional return ──────────────────────
+  // useSimulationClock is a hook; calling it after an early `return null` would
+  // violate the Rules of Hooks and crash React (changing hook count per render).
+  const currentJde = useSimulationClock((state) => state.currentJde);
+
   // Hide FactCard if no recognized body selected, or during guided tour / tutorial to avoid collisions
   if (!selectedId || (!isPlanetOrMoon && !isSatellite && !isComet && !isAsteroid) || isTourOpen || isTutorialOpen) {
     return null;
   }
 
-  const currentJde = useSimulationClock((state) => state.currentJde);
   const meta = isPlanetOrMoon ? PLANETARY_METADATA[selectedId as PlanetKey] : null;
   const satTelemetry = isSatellite && satMeta ? propagateSatellite(satMeta, jdeToDate(currentJde), 2.0) : null;
   const cometState = isComet && cometMeta ? getCometHeliocentricPosition(cometMeta, currentJde) : null;
