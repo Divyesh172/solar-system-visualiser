@@ -9,13 +9,13 @@ import type { NearEarthAsteroid } from '../../science/nasaNeoApi';
 
 interface AsteroidEntityProps {
   asteroid: NearEarthAsteroid;
-  lunarDistanceScale: number; // scene units for 1 Lunar Distance (8.0)
+  earthRadius: number;
   index: number;
 }
 
 const AsteroidEntity: FC<AsteroidEntityProps> = ({
   asteroid,
-  lunarDistanceScale,
+  earthRadius,
   index,
 }) => {
   const selectBody = useFocusStore((state) => state.selectBody);
@@ -33,32 +33,68 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
   const hazardTexture = useTexture('/textures/asteroid_hazard.jpg');
   const surfaceTexture = asteroid.isPotentiallyHazardous ? hazardTexture : rockyTexture;
 
+  // Scaled orbital reference distances
+  // Earth surface is at earthRadius (2.2). Satellites orbit up to earthRadius + 0.55 (2.75).
+  // Moon is at earthRadius * 3.8 (8.36), representing 1.0 Lunar Distance (LD).
+  const minSafeDistance = earthRadius + 1.4; // 3.6 units — generous vacuum clearance outside Earth & satellites
+  const lunarOrbitDistance = earthRadius * 3.8; // 8.36 units = 1.0 LD
+
   // Compute fixed 3D approach vector around Earth (distributing angles across catalog)
-  const { trajectoryPoints, closestApproachPos, flybyVelocityDir } = useMemo(() => {
-    // Distance from Earth center in scene units
-    const d = Math.max(2.1, asteroid.missDistanceLunar * lunarDistanceScale);
+  const { trajectoryPoints, closestApproachPos, flybyVelocityDir, periapsisDistance, curveDeflection } = useMemo(() => {
+    // Proportional visual distance calculation:
+    // Sub-lunar asteroids (< 1 LD) smoothly span from minSafeDistance (3.6) to lunarOrbitDistance (8.36).
+    // Trans-lunar asteroids (> 1 LD) extend outward without cluttering.
+    let d: number;
+    const missLD = Math.max(0.005, asteroid.missDistanceLunar);
+    if (missLD <= 1.0) {
+      d = minSafeDistance + (lunarOrbitDistance - minSafeDistance) * Math.pow(missLD, 0.7);
+    } else if (missLD <= 3.0) {
+      d = lunarOrbitDistance + (missLD - 1.0) * 2.8;
+    } else {
+      d = lunarOrbitDistance + 5.6 + Math.log2(missLD / 3.0 + 1.0) * 6.0;
+    }
 
-    // Give each asteroid a unique inclination and approach angle around Earth
-    const phi = (index * 1.35) % (Math.PI * 2);
-    const theta = (((index * 2.1) % Math.PI) - Math.PI / 2) * 0.55;
+    // Golden angle spiral distribution to prevent any two asteroids or labels from overlapping
+    const goldenAngle = 2.399963229728653; // ~137.5°
+    const yNorm = ((index % 8) / 7) * 1.3 - 0.65; // [-0.65, +0.65] avoiding polar singularities
+    const rAtY = Math.sqrt(Math.max(0.1, 1 - yNorm * yNorm));
+    const phi = index * goldenAngle;
 
-    // Closest approach position vector
-    const x = d * Math.cos(theta) * Math.cos(phi);
-    const y = d * Math.sin(theta);
-    const z = d * Math.cos(theta) * Math.sin(phi);
-    const closestPos = new THREE.Vector3(x, y, z);
+    const dirX = Math.cos(phi) * rAtY;
+    const dirY = yNorm;
+    const dirZ = Math.sin(phi) * rAtY;
+    const approachDir = new THREE.Vector3(dirX, dirY, dirZ).normalize();
 
-    // Direction of relative flyby velocity (tangent to approach vector)
-    const velDir = new THREE.Vector3(-Math.sin(phi), 0.3 * Math.cos(theta), Math.cos(phi)).normalize();
+    // Closest approach position vector (at periapsis distance d from Earth center)
+    const closestPos = approachDir.clone().multiplyScalar(d);
 
-    // Hyperbolic flyby path across Earth's neighborhood (-30 to +30 units)
+    // Strictly orthogonal velocity direction: velDir · closestPos = 0
+    // This mathematically guarantees that the flyby path NEVER dips closer to Earth than d.
+    const refVec = Math.abs(approachDir.y) < 0.85
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0);
+    const tangent1 = new THREE.Vector3().crossVectors(approachDir, refVec).normalize();
+    const tangent2 = new THREE.Vector3().crossVectors(approachDir, tangent1).normalize();
+
+    // Unique orbital inclination plane angle for each asteroid
+    const planeAngle = index * 1.35 + 0.5;
+    const velDir = new THREE.Vector3()
+      .addScaledVector(tangent1, Math.cos(planeAngle))
+      .addScaledVector(tangent2, Math.sin(planeAngle))
+      .normalize();
+
+    // Hyperbolic flyby path across Earth's neighborhood.
+    // At t = 0 (closest approach), distance is exactly d.
+    // For |t| > 0, the trajectory bends away from Earth into deep space, so distance is always >= d >= 3.6.
     const points: THREE.Vector3[] = [];
-    const span = 45.0;
-    const steps = 60;
+    const span = Math.max(35.0, d * 3.5);
+    const steps = 70;
+    const deflectionScale = Math.max(12.0, d * 1.8);
+
     for (let i = 0; i <= steps; i++) {
       const t = -span + (2.0 * span * i) / steps;
-      // Hyperbolic deflection curving slightly around Earth
-      const curveOffset = Math.exp(-Math.abs(t) / 12.0) * 0.45;
+      // Hyperbolic deflection curving away from Earth (always positive):
+      const curveOffset = (t * t) / (2.0 * deflectionScale * d);
       const pt = new THREE.Vector3()
         .copy(closestPos)
         .multiplyScalar(1.0 + curveOffset)
@@ -70,8 +106,10 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
       trajectoryPoints: points,
       closestApproachPos: closestPos,
       flybyVelocityDir: velDir,
+      periapsisDistance: d,
+      curveDeflection: deflectionScale,
     };
-  }, [asteroid.missDistanceLunar, lunarDistanceScale, index]);
+  }, [asteroid.missDistanceLunar, minSafeDistance, lunarOrbitDistance, index]);
 
   const trajectoryGeometry = useMemo(() => {
     return new THREE.BufferGeometry().setFromPoints(trajectoryPoints);
@@ -104,21 +142,24 @@ const AsteroidEntity: FC<AsteroidEntityProps> = ({
     const currentSimMs = (currentJde - 2440587.5) * 86400000.0;
     const deltaHours = (currentSimMs - asteroid.epochDateCloseApproach) / (3600.0 * 1000.0);
 
-    // If within close approach window (+- 36 hours), move along velocity vector
+    // If within close approach window (+- 36 hours), move along hyperbolic trajectory
     let currentPos: THREE.Vector3;
     if (Math.abs(deltaHours) <= 36.0) {
       // Scale flyby velocity into scene units per hour
-      const speedScale = (asteroid.relativeVelocityKmS / 384400.0) * lunarDistanceScale * 3600.0 * 0.15;
+      const speedScale = (asteroid.relativeVelocityKmS / 384400.0) * lunarOrbitDistance * 3600.0 * 0.15;
+      const t = deltaHours * speedScale;
+      const curveOffset = (t * t) / (2.0 * curveDeflection * periapsisDistance);
       currentPos = new THREE.Vector3()
         .copy(closestApproachPos)
-        .addScaledVector(flybyVelocityDir, deltaHours * speedScale);
+        .multiplyScalar(1.0 + curveOffset)
+        .addScaledVector(flybyVelocityDir, t);
 
       // Trigger active radar alert if within 12 hours of closest approach
       if (Math.abs(deltaHours) < 12.0) {
         setActiveAlert(asteroid);
       }
     } else {
-      // Park at periapsis marker
+      // Park at periapsis marker (safely outside Earth at distance d >= 3.6)
       currentPos = closestApproachPos;
     }
 
@@ -257,9 +298,6 @@ export const AsteroidFlybySystem: FC<{ earthRadius: number }> = ({ earthRadius }
   const showAsteroids = useAsteroidStore((state) => state.showAsteroids);
   const asteroids = useAsteroidStore((state) => state.asteroids);
 
-  // 1 Lunar Distance (384,400 km) = 8.0 units in Earth-relative coordinates
-  const lunarDistanceScale = earthRadius * 4.0;
-
   if (!showAsteroids) return null;
 
   return (
@@ -268,7 +306,7 @@ export const AsteroidFlybySystem: FC<{ earthRadius: number }> = ({ earthRadius }
         <AsteroidEntity
           key={`neo-${ast.id}`}
           asteroid={ast}
-          lunarDistanceScale={lunarDistanceScale}
+          earthRadius={earthRadius}
           index={idx}
         />
       ))}

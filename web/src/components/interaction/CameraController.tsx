@@ -75,21 +75,51 @@ export const CameraController: FC<CameraControllerProps> = ({ controlsRef, getTa
       0.5
     );
 
-    // Calculate eye position: approach along current viewing vector
+    // Calculate eye position: resolve towards the sun-facing (illuminated daylight) side of the planet
     const currentCameraPos = new THREE.Vector3();
     controls.getPosition(currentCameraPos);
 
-    // IMPORTANT: check lengthSq BEFORE normalizing to catch degenerate (near-zero) vectors.
-    // normalize() on a near-zero vector produces NaN which silently blacks out the renderer.
-    const rawOffset = new THREE.Vector3().subVectors(currentCameraPos, pos);
-    const offset = rawOffset.lengthSq() > 0.0001
-      ? rawOffset.normalize()
-      : new THREE.Vector3(0.6, 0.4, 0.8).normalize();
+    // Vector from target towards Sun at (0, 0, 0) in world space
+    const toSun = new THREE.Vector3(0, 0, 0).sub(pos);
+    const distToSunSq = toSun.lengthSq();
 
-    // Add a slight upward tilt for a cinematic look, but clamp to prevent going underground
+    let offset: THREE.Vector3;
+
+    if (distToSunSq < 0.01) {
+      // Target is the Sun itself (at origin): approach along current camera viewing vector
+      const rawOffset = new THREE.Vector3().subVectors(currentCameraPos, pos);
+      offset = rawOffset.lengthSq() > 0.0001
+        ? rawOffset.normalize()
+        : new THREE.Vector3(0.6, 0.4, 0.8).normalize();
+    } else {
+      toSun.normalize();
+
+      // World up direction (perpendicular to the ecliptic plane)
+      const up = new THREE.Vector3(0, 1, 0);
+
+      // Tangent vector perpendicular to the Sun-target line in the orbital plane
+      let side = new THREE.Vector3().crossVectors(up, toSun);
+      if (side.lengthSq() < 0.001) {
+        side = new THREE.Vector3().crossVectors(new THREE.Vector3(1, 0, 0), toSun);
+      }
+      side.normalize();
+
+      // Check current camera flank to pick the closer side (smooth swoop without 180° flip)
+      const currentCamDir = new THREE.Vector3().subVectors(currentCameraPos, pos);
+      const sideSign = currentCamDir.dot(side) >= 0 ? 1 : -1;
+
+      // Position camera prominently on the sunlit hemisphere (~82% sunward, ~34% flank, ~28% elevation)
+      // This produces a ~86% illuminated gibbous phase with the planet bathed in daylight and a dramatic terminator rim
+      offset = new THREE.Vector3()
+        .copy(toSun).multiplyScalar(0.82)
+        .addScaledVector(side, sideSign * 0.34)
+        .addScaledVector(up, 0.28)
+        .normalize();
+    }
+
     const eyePos = new THREE.Vector3(
       pos.x + offset.x * targetDistance,
-      pos.y + offset.y * targetDistance + targetDistance * 0.2,
+      pos.y + offset.y * targetDistance,
       pos.z + offset.z * targetDistance
     );
 
