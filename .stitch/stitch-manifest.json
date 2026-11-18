@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "stitch": {
+    "projectId": "5395773771278081201",
+    "referenceScreen": {
+      "id": "8047175338910646895",
+      "route": "/",
+      "title": "Solar System Visualizer",
+      "deviceType": "DESKTOP",
+      "extractedAt": "2026-11-16T07:31:23.564Z"
+    },
+    "referenceScreens": [
+      {
+        "id": "8047175338910646895",
+        "route": "/",
+        "title": "Solar System Visualizer",
+        "deviceType": "DESKTOP",
+        "extractedAt": "2026-11-16T07:31:23.564Z"
+      }
+    ]
+  }
+}

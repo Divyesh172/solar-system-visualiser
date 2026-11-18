@@ -1,0 +1,10 @@
+{
+  "name": "kidstar-solar-system-visualizer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "pnpm --dir web dev",
+    "build": "pnpm --dir web build",
+    "preview": "pnpm --dir web preview"
+  }
+}
