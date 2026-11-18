@@ -111,15 +111,35 @@ export const CameraController: FC<CameraControllerProps> = ({ controlsRef, getTa
     useSpaceshipStore.getState().startFlight(destinationName, destinationColor);
 
     const origSmoothTime = controls.smoothTime;
+    const origMinDistance = controls.minDistance;
     controls.smoothTime = 0.85; // Cinematic space flight duration
+    // Temporarily relax minDistance so the fly-to animation can reach its exact
+    // destination without being clamped short — which would prevent the Promise
+    // from resolving and leave isTransitioningRef permanently true (causing blackout).
+    controls.minDistance = 0;
 
     isTransitioningRef.current = true;
+
+    // Hard timeout fallback: if the setLookAt Promise never resolves (e.g. due
+    // to camera-controls clamping), clear the transitioning flag after 3s so
+    // orbit tracking resumes and the planet stays in view.
+    const transitionTimeout = setTimeout(() => {
+      if (isTransitioningRef.current) {
+        isTransitioningRef.current = false;
+        controls.smoothTime = origSmoothTime;
+        controls.minDistance = origMinDistance;
+        useSpaceshipStore.getState().endFlight();
+      }
+    }, 3000);
+
     controls
       .setLookAt(eyeX, eyeY, eyeZ, pos.x, pos.y, pos.z, true)
       .catch(() => {})
       .finally(() => {
+        clearTimeout(transitionTimeout);
         isTransitioningRef.current = false;
         controls.smoothTime = origSmoothTime;
+        controls.minDistance = origMinDistance;
         useSpaceshipStore.getState().endFlight();
       });
 
