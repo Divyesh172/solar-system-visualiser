@@ -61,31 +61,47 @@ export const CameraController: FC<CameraControllerProps> = ({ controlsRef, getTa
     if (selectedId === 'saturn') framingMultiplier = 4.8; // Give room for rings!
     if (selectedId === 'sun') framingMultiplier = 3.2;
 
-    const targetDistance =
+    // Ensure camera is always safely outside planet geometry
+    const minSafeDistance = activeTarget.radius * 1.5;
+    const targetDistance = Math.max(
       activeTarget.type === 'satellite'
         ? 0.95
         : activeTarget.type === 'asteroid'
         ? 1.8
         : activeTarget.type === 'comet'
         ? 3.2
-        : Math.max(activeTarget.radius * framingMultiplier, 4.0);
+        : Math.max(activeTarget.radius * framingMultiplier, 4.0),
+      minSafeDistance,
+      0.5
+    );
 
     // Calculate eye position: approach along current viewing vector
     const currentCameraPos = new THREE.Vector3();
     controls.getPosition(currentCameraPos);
 
-    const offset = new THREE.Vector3()
-      .subVectors(currentCameraPos, pos)
-      .normalize();
+    // IMPORTANT: check lengthSq BEFORE normalizing to catch degenerate (near-zero) vectors.
+    // normalize() on a near-zero vector produces NaN which silently blacks out the renderer.
+    const rawOffset = new THREE.Vector3().subVectors(currentCameraPos, pos);
+    const offset = rawOffset.lengthSq() > 0.0001
+      ? rawOffset.normalize()
+      : new THREE.Vector3(0.6, 0.4, 0.8).normalize();
 
-    // Default angle if straight on
-    if (offset.lengthSq() < 0.01) {
-      offset.set(0.6, 0.4, 0.8).normalize();
+    // Add a slight upward tilt for a cinematic look, but clamp to prevent going underground
+    const eyePos = new THREE.Vector3(
+      pos.x + offset.x * targetDistance,
+      pos.y + offset.y * targetDistance + targetDistance * 0.2,
+      pos.z + offset.z * targetDistance
+    );
+
+    // Safety clamp: if eye somehow ended up inside the planet, push it out
+    const eyeDistToTarget = eyePos.distanceTo(pos);
+    if (eyeDistToTarget < minSafeDistance) {
+      eyePos.sub(pos).normalize().multiplyScalar(minSafeDistance).add(pos);
     }
 
-    const eyeX = pos.x + offset.x * targetDistance;
-    const eyeY = pos.y + offset.y * targetDistance + targetDistance * 0.2;
-    const eyeZ = pos.z + offset.z * targetDistance;
+    const eyeX = eyePos.x;
+    const eyeY = eyePos.y;
+    const eyeZ = eyePos.z;
 
     // Trigger Spaceship flight animation and sound
     const destinationName = activeTarget.name;
